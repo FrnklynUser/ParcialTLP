@@ -1,10 +1,10 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from api.models import Pedido, PedidoDetalle, Cliente, Promocion, CondicionPromocion, BeneficioPromocion, PromocionAplicada, Producto, Sucursal
+from api.models import Pedido, PedidoDetalle, Cliente, Producto, Sucursal
 from django.db import transaction
-from datetime import date
 from django.core.exceptions import ObjectDoesNotExist
+from api.services.promocion_engine import PromocionEngine
 
 class PedidoViewSet(viewsets.ViewSet):
     @transaction.atomic
@@ -28,33 +28,10 @@ class PedidoViewSet(viewsets.ViewSet):
         pedido.total_monto = total_monto
         pedido.save()
 
-        hoy = date.today()
-        promociones = Promocion.objects.filter(
-            fecha_inicio__lte=hoy,
-            fecha_fin__gte=hoy,
-            empresa=sucursal.empresa,
-            sucursal=sucursal,
-            canal_cliente=cliente.canal
-        )
-        bonificaciones = []
-        for promo in promociones:
-            for condicion in promo.condiciones.all():
-                if condicion.tipo_condicion == 'cantidad' and condicion.producto:
-                    cantidad_pedido = sum([d['cantidad'] for d in detalles if int(d['producto']) == condicion.producto.id])
-                    if cantidad_pedido >= condicion.valor_min:
-                        multiplos = int(cantidad_pedido // condicion.valor_min)
-                        for beneficio in promo.beneficios.all():
-                            if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
-                                bonificacion_total = beneficio.cantidad * multiplos
-                                bonificaciones.append({
-                                    'producto_bonificado': beneficio.producto_bonificado.id,
-                                    'cantidad': bonificacion_total
-                                })
-                                PromocionAplicada.objects.create(
-                                    pedido=pedido,
-                                    promocion=promo,
-                                    descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre}"
-                                )
+        # Usar el motor de promociones
+        engine = PromocionEngine(pedido, detalles)
+        bonificaciones = engine.aplicar_promociones()
+
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
