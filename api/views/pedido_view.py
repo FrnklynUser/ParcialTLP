@@ -29,6 +29,7 @@ class PedidoViewSet(viewsets.ViewSet):
         pedido.save()
 
         hoy = date.today()
+        # Se activa el filtro de fechas para cumplir la regla de vigencia
         promociones = Promocion.objects.filter(
             fecha_inicio__lte=hoy,
             fecha_fin__gte=hoy,
@@ -46,15 +47,18 @@ class PedidoViewSet(viewsets.ViewSet):
                         for beneficio in promo.beneficios.all():
                             if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
                                 bonificacion_total = beneficio.cantidad * multiplos
-                                bonificaciones.append({
-                                    'producto_bonificado': beneficio.producto_bonificado.id,
-                                    'cantidad': bonificacion_total
-                                })
-                                PromocionAplicada.objects.create(
-                                    pedido=pedido,
-                                    promocion=promo,
-                                    descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre}"
-                                )
+                                if bonificacion_total > 0:
+                                    bonificaciones.append({
+                                        'producto_bonificado_id': beneficio.producto_bonificado.id,
+                                        'producto_bonificado_nombre': beneficio.producto_bonificado.nombre,
+                                        'cantidad': bonificacion_total,
+                                        'promocion': promo.nombre
+                                    })
+                                    PromocionAplicada.objects.create(
+                                        pedido=pedido,
+                                        promocion=promo,
+                                        descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre} por promoción '{promo.nombre}'"
+                                    )
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
