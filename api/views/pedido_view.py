@@ -97,6 +97,40 @@ class PedidoViewSet(viewsets.ViewSet):
                                         )
                                 except Producto.DoesNotExist:
                                     continue
+        # --- Lógica adicional para CASO 3: Descuento por volumen en producto BEL001 solo COBERTURA ---
+        for promo in promociones:
+            for condicion in promo.condiciones.all():
+                if (
+                    condicion.tipo_condicion == 'cantidad' and
+                    condicion.producto and
+                    condicion.producto.codigo == 'BEL001' and
+                    condicion.bonificacion_descuento
+                ):
+                    # Solo para canal COBERTURA
+                    if cliente.canal.nombre.upper() == 'COBERTURA':
+                        cantidad_pedido = sum([
+                            d['cantidad'] for d in detalles
+                            if Producto.objects.get(id=d['producto']).codigo == 'BEL001'
+                        ])
+                        if cantidad_pedido > 60:  # Más de 5 cajas (60 unidades)
+                            # Buscar beneficio de tipo descuento
+                            for beneficio in promo.beneficios.all():
+                                if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                                    descuento = total_monto * (beneficio.porcentaje_descuento / 100)
+                                    total_monto -= descuento
+                                    pedido.total_monto = total_monto
+                                    pedido.save()
+                                    bonificaciones.append({
+                                        'descuento': f"{beneficio.porcentaje_descuento}%",
+                                        'producto': condicion.producto.nombre,
+                                        'cantidad': cantidad_pedido,
+                                        'promocion': promo.nombre
+                                    })
+                                    PromocionAplicada.objects.create(
+                                        pedido=pedido,
+                                        promocion=promo,
+                                        descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de más de 60 unidades de {condicion.producto.nombre} (CASO 3)"
+                                    )
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
