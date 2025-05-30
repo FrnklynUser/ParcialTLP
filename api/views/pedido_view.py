@@ -242,11 +242,7 @@ class PedidoViewSet(viewsets.ViewSet):
                 'monto_descuento': round(descuento_caso6, 2),
                 'promocion': 'Descuento escalonado por monto (CASO 6)'
             })
-            PromocionAplicada.objects.create(
-                pedido=pedido,
-                promocion=None,
-                descripcion_resultado=f"Descuento del {porcentaje_descuento_caso6}% por compra de S/{monto_producto_c} en Producto C (CASO 6)"
-            )
+            # No crear PromocionAplicada porque no hay promocion asociada
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
