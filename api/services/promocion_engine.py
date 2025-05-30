@@ -73,17 +73,21 @@ class PromocionEngine:
         # CASO 2 y 5: Bonificación o descuento por importe en línea y marca
         elif condicion.tipo_condicion == 'importe' and condicion.linea_producto:
             importe = 0
+            productos_en_linea = []
             for d in self.detalles:
                 try:
                     producto = Producto.objects.get(id=d['producto'])
                 except Producto.DoesNotExist:
                     continue
                 if producto.linea_id == condicion.linea_producto.id:
+                    productos_en_linea.append(producto.id)
                     # Si la condición requiere marca, filtrar por marca
                     if hasattr(condicion, 'marca') and condicion.marca:
                         if producto.marca != condicion.marca:
                             continue
                     importe += d['cantidad'] * d.get('precio_unitario', 0)
+            # Debug: mostrar productos considerados y el importe
+            print(f"[DEBUG] Productos en línea {condicion.linea_producto.id}: {productos_en_linea}, Importe total: {importe}")
             if importe >= condicion.valor_min:
                 multiplos = int(importe // condicion.valor_min) if not condicion.valor_max else 1
                 for beneficio in promo.beneficios.all():
@@ -115,18 +119,30 @@ class PromocionEngine:
                                 descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% sobre línea {condicion.linea_producto.nombre} por importe: S/{round(descuento,2)}"
                             )
                             self.promociones_aplicadas.append(promo)
+            else:
+                print(f"[DEBUG] No se alcanza el importe mínimo para la línea {condicion.linea_producto.id}. Importe: {importe}, Mínimo: {condicion.valor_min}")
 
     def _filtrar_promociones(self):
         hoy = date.today()
         sucursal = self.pedido.sucursal
         cliente = self.pedido.cliente
-        return Promocion.objects.filter(
+        # Filtrar solo promociones del canal correspondiente
+        promociones = Promocion.objects.filter(
             fecha_inicio__lte=hoy,
             fecha_fin__gte=hoy,
             empresa=sucursal.empresa,
             sucursal=sucursal,
             canal_cliente=cliente.canal
         )
+        # Si la promoción es para canal MAYORISTA, solo aplicar si el cliente es mayorista
+        promociones_filtradas = []
+        for promo in promociones:
+            if promo.canal_cliente.nombre.upper() == 'MAYORISTA':
+                if cliente.canal.nombre.upper() == 'MAYORISTA':
+                    promociones_filtradas.append(promo)
+            else:
+                promociones_filtradas.append(promo)
+        return promociones_filtradas
 
     def _cumple_condiciones(self, promo):
         """
