@@ -215,6 +215,38 @@ class PedidoViewSet(viewsets.ViewSet):
                                         promocion=promo,
                                         descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de S/300+ en línea {condicion.linea_producto.nombre} (CASO 5)"
                                     )
+        # --- Lógica adicional para CASO 6: Descuento escalonado por monto para producto C ---
+        # Suponiendo que el código del producto C es 'C'. Cambia esto si el código es diferente.
+        monto_producto_c = 0
+        for d in detalles:
+            prod = Producto.objects.get(id=d['producto'])
+            if prod.codigo == 'C':
+                monto_producto_c += d['cantidad'] * d['precio_unitario']
+        descuento_caso6 = 0
+        porcentaje_descuento_caso6 = 0
+        if monto_producto_c >= 500 and monto_producto_c <= 1499:
+            porcentaje_descuento_caso6 = 2
+        elif monto_producto_c >= 1500 and monto_producto_c <= 4000:
+            porcentaje_descuento_caso6 = 4
+        elif monto_producto_c > 4000:
+            porcentaje_descuento_caso6 = 5
+        if porcentaje_descuento_caso6 > 0:
+            descuento_caso6 = monto_producto_c * (porcentaje_descuento_caso6 / 100)
+            total_monto -= descuento_caso6
+            pedido.total_monto = total_monto
+            pedido.save()
+            bonificaciones.append({
+                'descuento': f"{porcentaje_descuento_caso6}%",
+                'producto': 'Producto C',
+                'monto_producto_c': round(monto_producto_c, 2),
+                'monto_descuento': round(descuento_caso6, 2),
+                'promocion': 'Descuento escalonado por monto (CASO 6)'
+            })
+            PromocionAplicada.objects.create(
+                pedido=pedido,
+                promocion=None,
+                descripcion_resultado=f"Descuento del {porcentaje_descuento_caso6}% por compra de S/{monto_producto_c} en Producto C (CASO 6)"
+            )
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
