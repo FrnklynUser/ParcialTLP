@@ -1,0 +1,197 @@
+{
+  "info": {
+    "_postman_id": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Caso 7 - Bonificación Escalonada AB",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Crear Empresa",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Empresa Demo\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/empresa/", "host": ["{{base_url}}"], "path": ["api", "empresa", ""] }
+      }
+    },
+    {
+      "name": "Crear Sucursal",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Sucursal Central\",\n  \"empresa\": 1\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/sucursal/", "host": ["{{base_url}}"], "path": ["api", "sucursal", ""] }
+      }
+    },
+    {
+      "name": "Crear Canal Cliente",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"MAYORISTA\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/canal_cliente/", "host": ["{{base_url}}"], "path": ["api", "canal_cliente", ""] }
+      }
+    },
+    {
+      "name": "Crear Cliente",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Cliente Mayorista\",\n  \"canal\": 1\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/cliente/", "host": ["{{base_url}}"], "path": ["api", "cliente", ""] }
+      }
+    },
+    {
+      "name": "Crear Producto AB",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Producto AB\",\n  \"codigo\": \"AB\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/producto/", "host": ["{{base_url}}"], "path": ["api", "producto", ""] }
+      }
+    },
+    {
+      "name": "Crear Promoción Bonificación AB",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nombre\": \"Promo Bonificación AB\",\n  \"fecha_inicio\": \"2025-05-01\",\n  \"fecha_fin\": \"2025-06-30\",\n  \"empresa\": 1,\n  \"sucursal\": 1,\n  \"canal_cliente\": 1\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/promocion/", "host": ["{{base_url}}"], "path": ["api", "promocion", ""] }
+      }
+    },
+    {
+      "name": "Crear Condición 6-17 cajas",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"promocion\": 1,\n  \"tipo_condicion\": \"cantidad\",\n  \"valor_min\": 6,\n  \"valor_max\": 17,\n  \"producto\": 1,\n  \"bonificacion_descuento\": true\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/condicion_promocion/", "host": ["{{base_url}}"], "path": ["api", "condicion_promocion", ""] }
+      }
+    },
+    {
+      "name": "Crear Condición 18+ cajas",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"promocion\": 1,\n  \"tipo_condicion\": \"cantidad\",\n  \"valor_min\": 18,\n  \"valor_max\": null,\n  \"producto\": 1,\n  \"bonificacion_descuento\": true\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/condicion_promocion/", "host": ["{{base_url}}"], "path": ["api", "condicion_promocion", ""] }
+      }
+    },
+    {
+      "name": "Crear Beneficio 2 unidades (6 cajas)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 1,\n  \"cantidad\": 2\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/beneficio_promocion/", "host": ["{{base_url}}"], "path": ["api", "beneficio_promocion", ""] }
+      }
+    },
+    {
+      "name": "Crear Beneficio 9 unidades (18 cajas)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 1,\n  \"cantidad\": 9\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/beneficio_promocion/", "host": ["{{base_url}}"], "path": ["api", "beneficio_promocion", ""] }
+      }
+    },
+    {
+      "name": "Crear Pedido",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": 1,\n  \"sucursal\": 1\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/pedido/", "host": ["{{base_url}}"], "path": ["api", "pedido", ""] }
+      }
+    },
+    {
+      "name": "Crear Detalle Pedido (108 unidades)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pedido\": 1,\n  \"producto\": 1,\n  \"cantidad\": 108,\n  \"precio_unitario\": 10\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/pedido_detalle/", "host": ["{{base_url}}"], "path": ["api", "pedido_detalle", ""] }
+      }
+    },
+    {
+      "name": "Aplicar Promociones al Pedido",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{base_url}}/api/pedido/1/aplicar_promociones/", "host": ["{{base_url}}"], "path": ["api", "pedido", "1", "aplicar_promociones", ""] }
+      }
+    },
+    {
+      "name": "Ver Pedido con Bonificación",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{base_url}}/api/pedido/1/", "host": ["{{base_url}}"], "path": ["api", "pedido", "1", ""] }
+      }
+    }
+  ]
+}

@@ -168,38 +168,47 @@ class PromocionEngine:
             else:
                 print(f"[DEBUG] No se alcanza el importe mínimo para el producto {condicion.producto.id}. Importe: {importe_producto}, Mínimo: {condicion.valor_min}")
         # CASO 7: Bonificación escalonada por volumen (rango) para producto específico
-        # Ejemplo: Producto AB, 6 cajas (36 unidades) = 2 unidades bonificadas, 18 cajas (108 unidades) o más = 9 unidades bonificadas
-        # Solo ejecutar si NO se aplicó bonificación estándar arriba
+        # Generalización: soporta cualquier producto y escalas definidas en la base de datos
         if not bonificacion_aplicada and condicion.tipo_condicion == 'cantidad' and condicion.producto:
-            producto_ab_codigo = 'AB'  # Cambia esto si el identificador es diferente
-            try:
-                producto_obj = Producto.objects.get(id=condicion.producto.id)
-            except Producto.DoesNotExist:
-                producto_obj = None
-            if producto_obj and producto_obj.codigo == producto_ab_codigo:
-                cantidad_pedido = sum([
-                    d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
-                ])
-                # Asumimos que cada caja tiene 6 unidades
-                unidades_por_caja = 6
-                cajas_compradas = cantidad_pedido / unidades_por_caja
-                bonificacion = 0
-                if cajas_compradas >= 18:
-                    bonificacion = 9
-                elif cajas_compradas >= 6:
-                    bonificacion = 2
-                if bonificacion > 0:
-                    self.bonificaciones.append({
-                        'producto_bonificado': condicion.producto.id,
-                        'cantidad': bonificacion
-                    })
-                    PromocionAplicada.objects.create(
-                        pedido=self.pedido,
-                        promocion=promo,
-                        descripcion_resultado=f"Bonificación escalonada: {bonificacion} unidades de {producto_obj.nombre} por compra de {int(cajas_compradas)} cajas"
-                    )
-                    self.promociones_aplicadas.append(promo)
-                    return
+            # Buscar si hay escalas de bonificación configuradas para este producto
+            # Se asume que la condición puede tener valor_min, valor_max y el beneficio la cantidad a bonificar
+            # Opcional: unidades_por_caja puede ser un campo en la condición o beneficio, si no, default=6
+            unidades_por_caja = getattr(condicion, 'unidades_por_caja', 6)
+            cantidad_pedido = sum([
+                d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
+            ])
+            cajas_compradas = cantidad_pedido / unidades_por_caja if unidades_por_caja else cantidad_pedido
+            # Buscar escalas de bonificación (condiciones con valor_min, valor_max y beneficio asociado)
+            escalas = []
+            for c in promo.condiciones.all():
+                if c.tipo_condicion == 'cantidad' and c.producto and c.producto.id == condicion.producto.id:
+                    for b in promo.beneficios.all():
+                        if b.tipo_beneficio == 'bonificacion' and b.producto_bonificado and b.producto_bonificado.id == condicion.producto.id:
+                            escalas.append({
+                                'valor_min': c.valor_min,
+                                'valor_max': c.valor_max,
+                                'cantidad_bonificada': b.cantidad
+                            })
+            # Ordenar escalas por valor_min descendente para encontrar la mejor
+            escalas.sort(key=lambda x: x['valor_min'], reverse=True)
+            bonificacion = 0
+            for escala in escalas:
+                if (escala['valor_max'] is not None and escala['valor_min'] <= cajas_compradas <= escala['valor_max']) or \
+                   (escala['valor_max'] is None and cajas_compradas >= escala['valor_min']):
+                    bonificacion = escala['cantidad_bonificada']
+                    break
+            if bonificacion > 0:
+                self.bonificaciones.append({
+                    'producto_bonificado': condicion.producto.id,
+                    'cantidad': bonificacion
+                })
+                PromocionAplicada.objects.create(
+                    pedido=self.pedido,
+                    promocion=promo,
+                    descripcion_resultado=f"Bonificación escalonada: {bonificacion} unidades de {condicion.producto.nombre} por compra de {int(cajas_compradas)} cajas"
+                )
+                self.promociones_aplicadas.append(promo)
+                return
 
     def _filtrar_promociones(self):
         hoy = date.today()
