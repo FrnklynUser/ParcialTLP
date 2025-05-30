@@ -180,6 +180,41 @@ class PedidoViewSet(viewsets.ViewSet):
                                     promocion=promo,
                                     descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de {cantidad_glo01} unidades de {condicion.producto.nombre} (CASO 4)"
                                 )
+        # --- Lógica adicional para CASO 5: Descuento 5% por S/300+ en SALSAS/SILLAO solo MAYORISTA ---
+        for promo in promociones:
+            for condicion in promo.condiciones.all():
+                if (
+                    condicion.tipo_condicion == 'importe' and
+                    condicion.linea_producto and
+                    condicion.linea_producto.nombre.upper() in ['SALSAS', 'SILLAO'] and
+                    condicion.bonificacion_descuento
+                ):
+                    # Solo para canal MAYORISTA
+                    if cliente.canal.nombre.upper() == 'MAYORISTA':
+                        importe = 0
+                        for d in detalles:
+                            prod = Producto.objects.get(id=d['producto'])
+                            if prod.linea and prod.linea.nombre.upper() in ['SALSAS', 'SILLAO']:
+                                importe += d['cantidad'] * d['precio_unitario']
+                        if importe >= 300:
+                            for beneficio in promo.beneficios.all():
+                                if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                                    descuento = importe * (beneficio.porcentaje_descuento / 100)
+                                    total_monto -= descuento
+                                    pedido.total_monto = total_monto
+                                    pedido.save()
+                                    bonificaciones.append({
+                                        'descuento': f"{beneficio.porcentaje_descuento}%",
+                                        'linea': condicion.linea_producto.nombre,
+                                        'importe': round(importe, 2),
+                                        'monto_descuento': round(descuento, 2),
+                                        'promocion': promo.nombre
+                                    })
+                                    PromocionAplicada.objects.create(
+                                        pedido=pedido,
+                                        promocion=promo,
+                                        descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de S/300+ en línea {condicion.linea_producto.nombre} (CASO 5)"
+                                    )
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
