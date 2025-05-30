@@ -136,6 +136,50 @@ class PedidoViewSet(viewsets.ViewSet):
                                         promocion=promo,
                                         descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de más de 60 unidades de {condicion.producto.nombre} (CASO 3)"
                                     )
+        # --- Lógica adicional para CASO 4: Descuento escalonado por volumen para GLO01 (LECHE GLORIA T/PACK LIGHTx1lt) ---
+        for promo in Promocion.objects.filter(
+            fecha_inicio__lte=hoy,
+            fecha_fin__gte=hoy,
+            empresa=sucursal.empresa,
+            sucursal=sucursal,
+            tipo_promocion='descuento',
+        ):
+            for condicion in promo.condiciones.all():
+                if (
+                    condicion.tipo_condicion == 'cantidad' and
+                    condicion.producto and
+                    condicion.producto.codigo == 'GLO01' and
+                    condicion.bonificacion_descuento
+                ):
+                    cantidad_glo01 = sum([
+                        d['cantidad'] for d in detalles
+                        if Producto.objects.get(id=d['producto']).codigo == 'GLO01'
+                    ])
+                    if cantidad_glo01 >= condicion.valor_min and (
+                        condicion.valor_max is None or cantidad_glo01 <= condicion.valor_max
+                    ):
+                        for beneficio in promo.beneficios.all():
+                            if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                                descuento = 0
+                                for d in detalles:
+                                    prod = Producto.objects.get(id=d['producto'])
+                                    if prod.codigo == 'GLO01':
+                                        descuento += d['cantidad'] * d['precio_unitario'] * (beneficio.porcentaje_descuento / 100)
+                                total_monto -= descuento
+                                pedido.total_monto = total_monto
+                                pedido.save()
+                                bonificaciones.append({
+                                    'descuento': f"{beneficio.porcentaje_descuento}%",
+                                    'producto': condicion.producto.nombre,
+                                    'cantidad': cantidad_glo01,
+                                    'monto_descuento': round(descuento, 2),
+                                    'promocion': promo.nombre
+                                })
+                                PromocionAplicada.objects.create(
+                                    pedido=pedido,
+                                    promocion=promo,
+                                    descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de {cantidad_glo01} unidades de {condicion.producto.nombre} (CASO 4)"
+                                )
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
