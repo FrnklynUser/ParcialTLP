@@ -81,14 +81,15 @@ WSGI_APPLICATION = 'ParcialTLP.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.mysql'),
-        'NAME': os.getenv('DB_NAME', 'tesoreria_uss'),
-        'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'root'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '3306'),
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'mi_basedatos',
+        'USER': 'usuarioapp',
+        'PASSWORD': 'AppPass456',
+        'HOST': 'localhost',  
+        'PORT': '3306',      
     }
 }
+
 
 
 # Password validation
