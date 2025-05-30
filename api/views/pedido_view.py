@@ -113,10 +113,14 @@ class PedidoViewSet(viewsets.ViewSet):
                             if Producto.objects.get(id=d['producto']).codigo == 'BEL001'
                         ])
                         if cantidad_pedido > 60:  # Más de 5 cajas (60 unidades)
-                            # Buscar beneficio de tipo descuento
                             for beneficio in promo.beneficios.all():
                                 if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
-                                    descuento = total_monto * (beneficio.porcentaje_descuento / 100)
+                                    descuento = 0
+                                    # Solo se descuenta sobre el subtotal de BEL001
+                                    for d in detalles:
+                                        prod = Producto.objects.get(id=d['producto'])
+                                        if prod.codigo == 'BEL001':
+                                            descuento += d['cantidad'] * d['precio_unitario'] * (beneficio.porcentaje_descuento / 100)
                                     total_monto -= descuento
                                     pedido.total_monto = total_monto
                                     pedido.save()
@@ -124,6 +128,7 @@ class PedidoViewSet(viewsets.ViewSet):
                                         'descuento': f"{beneficio.porcentaje_descuento}%",
                                         'producto': condicion.producto.nombre,
                                         'cantidad': cantidad_pedido,
+                                        'monto_descuento': round(descuento, 2),
                                         'promocion': promo.nombre
                                     })
                                     PromocionAplicada.objects.create(
