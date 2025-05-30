@@ -28,8 +28,9 @@ class PedidoViewSet(viewsets.ViewSet):
         pedido.total_monto = total_monto
         pedido.save()
 
+        # Motor de promociones completamente dinámico
+        bonificaciones = []
         hoy = date.today()
-        # Se activa el filtro de fechas para cumplir la regla de vigencia
         promociones = Promocion.objects.filter(
             fecha_inicio__lte=hoy,
             fecha_fin__gte=hoy,
@@ -37,12 +38,16 @@ class PedidoViewSet(viewsets.ViewSet):
             sucursal=sucursal,
             canal_cliente=cliente.canal
         )
-        bonificaciones = []
         for promo in promociones:
             for condicion in promo.condiciones.all():
+                # --- Condición por cantidad de producto ---
                 if condicion.tipo_condicion == 'cantidad' and condicion.producto:
-                    cantidad_pedido = sum([d['cantidad'] for d in detalles if d['producto'] == condicion.producto.id])
-                    if cantidad_pedido >= condicion.valor_min:
+                    cantidad_pedido = sum([
+                        d['cantidad'] for d in detalles if d['producto'] == condicion.producto.id
+                    ])
+                    if cantidad_pedido >= condicion.valor_min and (
+                        condicion.valor_max is None or cantidad_pedido <= condicion.valor_max
+                    ):
                         multiplos = int(cantidad_pedido // condicion.valor_min)
                         for beneficio in promo.beneficios.all():
                             if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
@@ -59,111 +64,10 @@ class PedidoViewSet(viewsets.ViewSet):
                                         promocion=promo,
                                         descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre} por promoción '{promo.nombre}'"
                                     )
-        # --- Lógica adicional para CASO 2: Bonificación por importe, línea y marca, solo mayoristas ---
-        for promo in promociones:
-            for condicion in promo.condiciones.all():
-                if condicion.tipo_condicion == 'importe' and condicion.linea_producto and condicion.bonificacion_descuento:
-                    # Solo para canal mayorista
-                    if cliente.canal.nombre.upper() == 'MAYORISTA':
-                        # Sumar importe de productos de la línea y marca BOLÍVAR
-                        importe = 0
-                        for d in detalles:
-                            prod = Producto.objects.get(id=d['producto'])
-                            if prod.linea_id == condicion.linea_producto.id and prod.marca.upper() == 'BOLÍVAR':
-                                importe += d['cantidad'] * d['precio_unitario']
-                        if importe >= condicion.valor_min:
-                            multiplos = int(importe // condicion.valor_min)
-                            # Bonificaciones fijas del caso 2
-                            # 2 unidades de 400051B y 1 unidad de 400536B por cada S/100
-                            productos_bonificados = [
-                                {'codigo': '400051B', 'cantidad': 2},
-                                {'codigo': '400536B', 'cantidad': 1}
-                            ]
-                            for pb in productos_bonificados:
-                                try:
-                                    prod_bonif = Producto.objects.get(codigo=pb['codigo'])
-                                    bonificacion_total = pb['cantidad'] * multiplos
-                                    if bonificacion_total > 0:
-                                        bonificaciones.append({
-                                            'producto_bonificado_id': prod_bonif.id,
-                                            'producto_bonificado_nombre': prod_bonif.nombre,
-                                            'cantidad': bonificacion_total,
-                                            'promocion': promo.nombre
-                                        })
-                                        PromocionAplicada.objects.create(
-                                            pedido=pedido,
-                                            promocion=promo,
-                                            descripcion_resultado=f"Bonificación de {bonificacion_total} {prod_bonif.nombre} por promoción '{promo.nombre}' (CASO 2)"
-                                        )
-                                except Producto.DoesNotExist:
-                                    continue
-        # --- Lógica adicional para CASO 3: Descuento por volumen en producto BEL001 solo COBERTURA ---
-        for promo in promociones:
-            for condicion in promo.condiciones.all():
-                if (
-                    condicion.tipo_condicion == 'cantidad' and
-                    condicion.producto and
-                    condicion.producto.codigo == 'BEL001' and
-                    condicion.bonificacion_descuento
-                ):
-                    # Solo para canal COBERTURA
-                    if cliente.canal.nombre.upper() == 'COBERTURA':
-                        cantidad_pedido = sum([
-                            d['cantidad'] for d in detalles
-                            if Producto.objects.get(id=d['producto']).codigo == 'BEL001'
-                        ])
-                        if cantidad_pedido > 60:  # Más de 5 cajas (60 unidades)
-                            for beneficio in promo.beneficios.all():
-                                if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
-                                    descuento = 0
-                                    # Solo se descuenta sobre el subtotal de BEL001
-                                    for d in detalles:
-                                        prod = Producto.objects.get(id=d['producto'])
-                                        if prod.codigo == 'BEL001':
-                                            descuento += d['cantidad'] * d['precio_unitario'] * (beneficio.porcentaje_descuento / 100)
-                                    total_monto -= descuento
-                                    pedido.total_monto = total_monto
-                                    pedido.save()
-                                    bonificaciones.append({
-                                        'descuento': f"{beneficio.porcentaje_descuento}%",
-                                        'producto': condicion.producto.nombre,
-                                        'cantidad': cantidad_pedido,
-                                        'monto_descuento': round(descuento, 2),
-                                        'promocion': promo.nombre
-                                    })
-                                    PromocionAplicada.objects.create(
-                                        pedido=pedido,
-                                        promocion=promo,
-                                        descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de más de 60 unidades de {condicion.producto.nombre} (CASO 3)"
-                                    )
-        # --- Lógica adicional para CASO 4: Descuento escalonado por volumen para GLO01 (LECHE GLORIA T/PACK LIGHTx1lt) ---
-        for promo in Promocion.objects.filter(
-            fecha_inicio__lte=hoy,
-            fecha_fin__gte=hoy,
-            empresa=sucursal.empresa,
-            sucursal=sucursal,
-            tipo_promocion='descuento',
-        ):
-            for condicion in promo.condiciones.all():
-                if (
-                    condicion.tipo_condicion == 'cantidad' and
-                    condicion.producto and
-                    condicion.producto.codigo == 'GLO01' and
-                    condicion.bonificacion_descuento
-                ):
-                    cantidad_glo01 = sum([
-                        d['cantidad'] for d in detalles
-                        if Producto.objects.get(id=d['producto']).codigo == 'GLO01'
-                    ])
-                    if cantidad_glo01 >= condicion.valor_min and (
-                        condicion.valor_max is None or cantidad_glo01 <= condicion.valor_max
-                    ):
-                        for beneficio in promo.beneficios.all():
-                            if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                            elif beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
                                 descuento = 0
                                 for d in detalles:
-                                    prod = Producto.objects.get(id=d['producto'])
-                                    if prod.codigo == 'GLO01':
+                                    if d['producto'] == condicion.producto.id:
                                         descuento += d['cantidad'] * d['precio_unitario'] * (beneficio.porcentaje_descuento / 100)
                                 total_monto -= descuento
                                 pedido.total_monto = total_monto
@@ -171,98 +75,62 @@ class PedidoViewSet(viewsets.ViewSet):
                                 bonificaciones.append({
                                     'descuento': f"{beneficio.porcentaje_descuento}%",
                                     'producto': condicion.producto.nombre,
-                                    'cantidad': cantidad_glo01,
+                                    'cantidad': cantidad_pedido,
                                     'monto_descuento': round(descuento, 2),
                                     'promocion': promo.nombre
                                 })
                                 PromocionAplicada.objects.create(
                                     pedido=pedido,
                                     promocion=promo,
-                                    descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de {cantidad_glo01} unidades de {condicion.producto.nombre} (CASO 4)"
+                                    descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de {cantidad_pedido} unidades de {condicion.producto.nombre} (Promo: {promo.nombre})"
                                 )
-        # --- Lógica adicional para CASO 5: Descuento 5% por S/300+ en SALSAS/SILLAO solo MAYORISTA ---
-        for promo in promociones:
-            for condicion in promo.condiciones.all():
-                if (
-                    condicion.tipo_condicion == 'importe' and
-                    condicion.linea_producto and
-                    condicion.linea_producto.nombre.upper() in ['SALSAS', 'SILLAO'] and
-                    condicion.bonificacion_descuento
-                ):
-                    # Solo para canal MAYORISTA
-                    if cliente.canal.nombre.upper() == 'MAYORISTA':
-                        importe = 0
-                        for d in detalles:
-                            prod = Producto.objects.get(id=d['producto'])
-                            if prod.linea and prod.linea.nombre.upper() in ['SALSAS', 'SILLAO']:
+                # --- Condición por importe de línea/marca ---
+                elif condicion.tipo_condicion == 'importe' and condicion.linea_producto:
+                    importe = 0
+                    for d in detalles:
+                        prod = Producto.objects.get(id=d['producto'])
+                        if prod.linea_id == condicion.linea_producto.id:
+                            if not condicion.producto or prod.id == condicion.producto.id:
                                 importe += d['cantidad'] * d['precio_unitario']
-                        if importe >= 300:
-                            for beneficio in promo.beneficios.all():
-                                if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
-                                    descuento = importe * (beneficio.porcentaje_descuento / 100)
-                                    total_monto -= descuento
-                                    pedido.total_monto = total_monto
-                                    pedido.save()
+                    if importe >= condicion.valor_min and (
+                        condicion.valor_max is None or importe <= condicion.valor_max
+                    ):
+                        multiplos = int(importe // condicion.valor_min)
+                        for beneficio in promo.beneficios.all():
+                            if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
+                                bonificacion_total = beneficio.cantidad * multiplos
+                                if bonificacion_total > 0:
                                     bonificaciones.append({
-                                        'descuento': f"{beneficio.porcentaje_descuento}%",
-                                        'linea': condicion.linea_producto.nombre,
-                                        'importe': round(importe, 2),
-                                        'monto_descuento': round(descuento, 2),
+                                        'producto_bonificado_id': beneficio.producto_bonificado.id,
+                                        'producto_bonificado_nombre': beneficio.producto_bonificado.nombre,
+                                        'cantidad': bonificacion_total,
                                         'promocion': promo.nombre
                                     })
                                     PromocionAplicada.objects.create(
                                         pedido=pedido,
                                         promocion=promo,
-                                        descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de S/300+ en línea {condicion.linea_producto.nombre} (CASO 5)"
+                                        descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre} por promoción '{promo.nombre}'"
                                     )
-        # --- Lógica adicional para CASO 6: Descuento escalonado por monto para producto C ---
-        # Suponiendo que el código del producto C es 'C'. Cambia esto si el código es diferente.
-        monto_producto_c = 0
-        for d in detalles:
-            prod = Producto.objects.get(id=d['producto'])
-            if prod.codigo == 'C':
-                monto_producto_c += d['cantidad'] * d['precio_unitario']
-        descuento_caso6 = 0
-        porcentaje_descuento_caso6 = 0
-        if monto_producto_c >= 500 and monto_producto_c <= 1499:
-            porcentaje_descuento_caso6 = 2
-        elif monto_producto_c >= 1500 and monto_producto_c <= 4000:
-            porcentaje_descuento_caso6 = 4
-        elif monto_producto_c > 4000:
-            porcentaje_descuento_caso6 = 5
-        if porcentaje_descuento_caso6 > 0:
-            descuento_caso6 = monto_producto_c * (porcentaje_descuento_caso6 / 100)
-            total_monto -= descuento_caso6
-            pedido.total_monto = total_monto
-            pedido.save()
-            bonificaciones.append({
-                'descuento': f"{porcentaje_descuento_caso6}%",
-                'producto': 'Producto C',
-                'monto_producto_c': round(monto_producto_c, 2),
-                'monto_descuento': round(descuento_caso6, 2),
-                'promocion': 'Descuento escalonado por monto (CASO 6)'
-            })
-            # No crear PromocionAplicada porque no hay promocion asociada
-        # --- Lógica adicional para CASO 7: Bonificación por volumen en producto AB ---
-        # Suponiendo que el código del producto AB es 'AB'. Cambia esto si el código es diferente.
-        cantidad_ab = 0
-        for d in detalles:
-            prod = Producto.objects.get(id=d['producto'])
-            if prod.codigo == 'AB':
-                # Se asume que cada caja es una unidad en el pedido y cada caja tiene 6 unidades
-                cantidad_ab += d['cantidad']
-        bonificacion_ab = 0
-        if cantidad_ab >= 18:
-            bonificacion_ab = 9
-        elif cantidad_ab >= 6:
-            bonificacion_ab = 2
-        if bonificacion_ab > 0:
-            bonificaciones.append({
-                'producto_bonificado_codigo': 'AB',
-                'producto_bonificado_nombre': 'Producto AB',
-                'cantidad_bonificada': bonificacion_ab,
-                'promocion': 'Bonificación escalonada por volumen (CASO 7)'
-            })
+                            elif beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                                descuento = importe * (beneficio.porcentaje_descuento / 100)
+                                total_monto -= descuento
+                                pedido.total_monto = total_monto
+                                pedido.save()
+                                bonificaciones.append({
+                                    'descuento': f"{beneficio.porcentaje_descuento}%",
+                                    'linea': condicion.linea_producto.nombre,
+                                    'importe': round(importe, 2),
+                                    'monto_descuento': round(descuento, 2),
+                                    'promocion': promo.nombre
+                                })
+                                PromocionAplicada.objects.create(
+                                    pedido=pedido,
+                                    promocion=promo,
+                                    descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% por compra de S/{importe} en línea {condicion.linea_producto.nombre} (Promo: {promo.nombre})"
+                                )
+        # Actualizar el monto final del pedido
+        pedido.total_monto = total_monto
+        pedido.save()
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
