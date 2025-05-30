@@ -128,7 +128,6 @@ class PromocionEngine:
                 if int(d['producto']) == condicion.producto.id:
                     importe_producto += d['cantidad'] * d.get('precio_unitario', 0)
             # Buscar el mayor rango alcanzado entre todas las condiciones de la promo para este producto
-            # (asumiendo que hay varias condiciones para el mismo producto, cada una con su rango y %)
             condiciones_producto = [c for c in promo.condiciones.all() if c.tipo_condicion == 'importe' and c.producto and c.producto.id == condicion.producto.id]
             mejor_condicion = None
             for c in condiciones_producto:
@@ -136,22 +135,31 @@ class PromocionEngine:
                     if mejor_condicion is None or c.valor_min > mejor_condicion.valor_min:
                         mejor_condicion = c
             if mejor_condicion:
+                # Buscar el beneficio que corresponde exactamente al porcentaje de la condición encontrada
+                beneficio_escala = None
                 for beneficio in promo.beneficios.all():
                     if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
-                        # Solo aplicar si el beneficio corresponde a la condición encontrada
-                        if (mejor_condicion.valor_max is not None and mejor_condicion.valor_min <= importe_producto <= mejor_condicion.valor_max) or (mejor_condicion.valor_max is None and importe_producto >= mejor_condicion.valor_min):
-                            descuento = importe_producto * (beneficio.porcentaje_descuento / 100)
-                            self.bonificaciones.append({
-                                'producto_descuento': mejor_condicion.producto.id,
-                                'porcentaje_descuento': beneficio.porcentaje_descuento,
-                                'monto_descuento': round(descuento, 2)
-                            })
-                            PromocionAplicada.objects.create(
-                                pedido=self.pedido,
-                                promocion=promo,
-                                descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% sobre {mejor_condicion.producto.nombre} por importe: S/{round(descuento,2)}"
-                            )
-                            self.promociones_aplicadas.append(promo)
+                        # Relacionar beneficio con condición por porcentaje
+                        if (
+                            (mejor_condicion.valor_min == 500 and mejor_condicion.valor_max == 1499 and beneficio.porcentaje_descuento == 2) or
+                            (mejor_condicion.valor_min == 1500 and mejor_condicion.valor_max == 4000 and beneficio.porcentaje_descuento == 4) or
+                            (mejor_condicion.valor_min == 4001 and mejor_condicion.valor_max is None and beneficio.porcentaje_descuento == 5)
+                        ):
+                            beneficio_escala = beneficio
+                            break
+                if beneficio_escala:
+                    descuento = importe_producto * (beneficio_escala.porcentaje_descuento / 100)
+                    self.bonificaciones.append({
+                        'producto_descuento': mejor_condicion.producto.id,
+                        'porcentaje_descuento': beneficio_escala.porcentaje_descuento,
+                        'monto_descuento': round(descuento, 2)
+                    })
+                    PromocionAplicada.objects.create(
+                        pedido=self.pedido,
+                        promocion=promo,
+                        descripcion_resultado=f"Descuento del {beneficio_escala.porcentaje_descuento}% sobre {mejor_condicion.producto.nombre} por importe: S/{round(descuento,2)}"
+                    )
+                    self.promociones_aplicadas.append(promo)
             else:
                 print(f"[DEBUG] No se alcanza el importe mínimo para el producto {condicion.producto.id}. Importe: {importe_producto}, Mínimo: {condicion.valor_min}")
 
