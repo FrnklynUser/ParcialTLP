@@ -165,6 +165,39 @@ class PromocionEngine:
                     self._productos_descuento_aplicados.add(condicion.producto.id)
             else:
                 print(f"[DEBUG] No se alcanza el importe mínimo para el producto {condicion.producto.id}. Importe: {importe_producto}, Mínimo: {condicion.valor_min}")
+        # CASO 7: Bonificación escalonada por volumen (rango) para producto específico
+        # Ejemplo: Producto AB, 6 cajas (36 unidades) = 2 unidades bonificadas, 18 cajas (108 unidades) o más = 9 unidades bonificadas
+        if condicion.tipo_condicion == 'cantidad' and condicion.producto:
+            # Identificar si la promoción es del tipo "escalonada por volumen" para el producto AB
+            producto_ab_codigo = 'AB'  # Cambia esto si el identificador es diferente
+            try:
+                producto_obj = Producto.objects.get(id=condicion.producto.id)
+            except Producto.DoesNotExist:
+                producto_obj = None
+            if producto_obj and producto_obj.codigo == producto_ab_codigo:
+                cantidad_pedido = sum([
+                    d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
+                ])
+                # Asumimos que cada caja tiene 6 unidades
+                unidades_por_caja = 6
+                cajas_compradas = cantidad_pedido / unidades_por_caja
+                bonificacion = 0
+                if cajas_compradas >= 18:
+                    bonificacion = 9
+                elif cajas_compradas >= 6:
+                    bonificacion = 2
+                if bonificacion > 0:
+                    self.bonificaciones.append({
+                        'producto_bonificado': condicion.producto.id,
+                        'cantidad': bonificacion
+                    })
+                    PromocionAplicada.objects.create(
+                        pedido=self.pedido,
+                        promocion=promo,
+                        descripcion_resultado=f"Bonificación escalonada: {bonificacion} unidades de {producto_obj.nombre} por compra de {int(cajas_compradas)} cajas"
+                    )
+                    self.promociones_aplicadas.append(promo)
+                    return
 
     def _filtrar_promociones(self):
         hoy = date.today()
