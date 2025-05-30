@@ -31,6 +31,7 @@ class PromocionEngine:
         Delegar a calculadores de beneficio según tipo.
         """
         # CASO 1: Bonificación por cantidad de producto
+        bonificacion_aplicada = False
         if condicion.tipo_condicion == 'cantidad' and condicion.producto:
             cantidad_pedido = sum([
                 d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
@@ -50,6 +51,7 @@ class PromocionEngine:
                             descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre}"
                         )
                         self.promociones_aplicadas.append(promo)
+                        bonificacion_aplicada = True
                     elif beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
                         # CASO 3 y CASO 4: Descuento por cantidad (incluye escalas)
                         if (condicion.valor_max is None and cantidad_pedido >= condicion.valor_min) or \
@@ -167,8 +169,8 @@ class PromocionEngine:
                 print(f"[DEBUG] No se alcanza el importe mínimo para el producto {condicion.producto.id}. Importe: {importe_producto}, Mínimo: {condicion.valor_min}")
         # CASO 7: Bonificación escalonada por volumen (rango) para producto específico
         # Ejemplo: Producto AB, 6 cajas (36 unidades) = 2 unidades bonificadas, 18 cajas (108 unidades) o más = 9 unidades bonificadas
-        if condicion.tipo_condicion == 'cantidad' and condicion.producto:
-            # Identificar si la promoción es del tipo "escalonada por volumen" para el producto AB
+        # Solo ejecutar si NO se aplicó bonificación estándar arriba
+        if not bonificacion_aplicada and condicion.tipo_condicion == 'cantidad' and condicion.producto:
             producto_ab_codigo = 'AB'  # Cambia esto si el identificador es diferente
             try:
                 producto_obj = Producto.objects.get(id=condicion.producto.id)
