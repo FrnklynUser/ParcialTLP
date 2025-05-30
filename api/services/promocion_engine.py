@@ -1,6 +1,6 @@
 # api/services/promocion_engine.py
 
-from api.models import Promocion, PromocionAplicada, CondicionPromocion, BeneficioPromocion, Producto
+from api.models import Promocion, PromocionAplicada, CondicionPromocion, BeneficioPromocion, Producto, LineaProducto
 from datetime import date
 
 class PromocionEngine:
@@ -22,6 +22,7 @@ class PromocionEngine:
         promociones = self._filtrar_promociones()
         for promo in promociones:
             for condicion in promo.condiciones.all():
+                # CASO 1: Bonificación por cantidad de producto
                 if condicion.tipo_condicion == 'cantidad' and condicion.producto:
                     cantidad_pedido = sum([
                         d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
@@ -39,6 +40,36 @@ class PromocionEngine:
                                     pedido=self.pedido,
                                     promocion=promo,
                                     descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre}"
+                                )
+                                self.promociones_aplicadas.append(promo)
+                # CASO 2: Bonificación por importe en línea y marca
+                elif condicion.tipo_condicion == 'importe' and condicion.linea_producto:
+                    # Sumar el importe de los productos de la línea y marca especificada
+                    importe = 0
+                    for d in self.detalles:
+                        try:
+                            producto = Producto.objects.get(id=d['producto'])
+                        except Producto.DoesNotExist:
+                            continue
+                        if producto.linea_id == condicion.linea_producto.id:
+                            # Si la condición requiere marca, filtrar por marca
+                            if hasattr(condicion, 'marca') and condicion.marca:
+                                if producto.marca != condicion.marca:
+                                    continue
+                            importe += d['cantidad'] * d.get('precio_unitario', 0)
+                    if importe >= condicion.valor_min:
+                        multiplos = int(importe // condicion.valor_min)
+                        for beneficio in promo.beneficios.all():
+                            if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
+                                bonificacion_total = beneficio.cantidad * multiplos
+                                self.bonificaciones.append({
+                                    'producto_bonificado': beneficio.producto_bonificado.id,
+                                    'cantidad': bonificacion_total
+                                })
+                                PromocionAplicada.objects.create(
+                                    pedido=self.pedido,
+                                    promocion=promo,
+                                    descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre} por importe"
                                 )
                                 self.promociones_aplicadas.append(promo)
         return self.bonificaciones
