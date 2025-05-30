@@ -42,6 +42,25 @@ class PromocionEngine:
                                     descripcion_resultado=f"Bonificación de {bonificacion_total} {beneficio.producto_bonificado.nombre}"
                                 )
                                 self.promociones_aplicadas.append(promo)
+                            elif beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                                # CASO 3: Descuento por cantidad
+                                # Calcular el monto total del producto en el pedido
+                                monto_producto = sum([
+                                    d['cantidad'] * d.get('precio_unitario', 0)
+                                    for d in self.detalles if int(d['producto']) == condicion.producto.id
+                                ])
+                                descuento = monto_producto * (beneficio.porcentaje_descuento / 100)
+                                self.bonificaciones.append({
+                                    'producto_descuento': condicion.producto.id,
+                                    'porcentaje_descuento': beneficio.porcentaje_descuento,
+                                    'monto_descuento': round(descuento, 2)
+                                })
+                                PromocionAplicada.objects.create(
+                                    pedido=self.pedido,
+                                    promocion=promo,
+                                    descripcion_resultado=f"Descuento del {beneficio.porcentaje_descuento}% sobre {condicion.producto.nombre} por volumen: S/{round(descuento,2)}"
+                                )
+                                self.promociones_aplicadas.append(promo)
                 # CASO 2: Bonificación por importe en línea y marca
                 elif condicion.tipo_condicion == 'importe' and condicion.linea_producto:
                     # Sumar el importe de los productos de la línea y marca especificada
