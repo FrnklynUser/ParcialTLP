@@ -243,6 +243,26 @@ class PedidoViewSet(viewsets.ViewSet):
                 'promocion': 'Descuento escalonado por monto (CASO 6)'
             })
             # No crear PromocionAplicada porque no hay promocion asociada
+        # --- Lógica adicional para CASO 7: Bonificación por volumen en producto AB ---
+        # Suponiendo que el código del producto AB es 'AB'. Cambia esto si el código es diferente.
+        cantidad_ab = 0
+        for d in detalles:
+            prod = Producto.objects.get(id=d['producto'])
+            if prod.codigo == 'AB':
+                # Se asume que cada caja es una unidad en el pedido y cada caja tiene 6 unidades
+                cantidad_ab += d['cantidad']
+        bonificacion_ab = 0
+        if cantidad_ab >= 18:
+            bonificacion_ab = 9
+        elif cantidad_ab >= 6:
+            bonificacion_ab = 2
+        if bonificacion_ab > 0:
+            bonificaciones.append({
+                'producto_bonificado_codigo': 'AB',
+                'producto_bonificado_nombre': 'Producto AB',
+                'cantidad_bonificada': bonificacion_ab,
+                'promocion': 'Bonificación escalonada por volumen (CASO 7)'
+            })
         return Response({
             'pedido_id': pedido.id,
             'bonificaciones': bonificaciones
