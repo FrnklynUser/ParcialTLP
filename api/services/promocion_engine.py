@@ -10,7 +10,7 @@ class PromocionEngine:
     """
     def __init__(self, pedido, detalles):
         self.pedido = pedido
-        self.detalles = detalles  # lista de dicts: [{'producto': id, 'cantidad': x, ...}]
+        self.detalles = detalles 
         self.promociones_aplicadas = []
         self.bonificaciones = []
 
@@ -30,7 +30,7 @@ class PromocionEngine:
         Calcula el beneficio (bonificación, descuento, etc.) para la promoción.
         Delegar a calculadores de beneficio según tipo.
         """
-        # CASO 1: Bonificación por cantidad de producto
+        # CASO1  Bonificación por cantidad de producto
         bonificacion_aplicada = False
         if condicion.tipo_condicion == 'cantidad' and condicion.producto:
             cantidad_pedido = sum([
@@ -83,8 +83,7 @@ class PromocionEngine:
                     continue
                 if producto.linea_id == condicion.linea_producto.id:
                     productos_en_linea.append(producto.id)
-                    # Si la condición requiere marca, filtrar por marca
-                    if hasattr(condicion, 'marca') and condicion.marca:
+                    if hasattr(condicion, 'marca') and condicion.marca: 
                         if producto.marca != condicion.marca:
                             continue
                     importe += d['cantidad'] * d.get('precio_unitario', 0)
@@ -263,5 +262,4 @@ class PromocionEngine:
         # TODO: Implementar evaluación de condiciones.
         return False
 
-    # NOTA: Implementar clases/fábricas para evaluadores de condición y calculadores de beneficio en este módulo o submódulos.
-    # Ejemplo: CondicionPorProductoEvaluator, BeneficioBonificacionCalculator, etc.
+  

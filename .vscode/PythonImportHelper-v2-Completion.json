@@ -1154,7 +1154,7 @@
         "kind": 6,
         "importPath": "api.services.promocion_engine",
         "description": "api.services.promocion_engine",
-        "peekOfCode": "class PromocionEngine:\n    \"\"\"\n    Motor principal para la aplicación de promociones a un pedido.\n    Orquesta el filtrado, evaluación de condiciones y cálculo de beneficios.\n    \"\"\"\n    def __init__(self, pedido, detalles):\n        self.pedido = pedido\n        self.detalles = detalles  # lista de dicts: [{'producto': id, 'cantidad': x, ...}]\n        self.promociones_aplicadas = []\n        self.bonificaciones = []",
+        "peekOfCode": "class PromocionEngine:\n    \"\"\"\n    Motor principal para la aplicación de promociones a un pedido.\n    Orquesta el filtrado, evaluación de condiciones y cálculo de beneficios.\n    \"\"\"\n    def __init__(self, pedido, detalles):\n        self.pedido = pedido\n        self.detalles = detalles \n        self.promociones_aplicadas = []\n        self.bonificaciones = []",
         "detail": "api.services.promocion_engine",
         "documentation": {}
     },
