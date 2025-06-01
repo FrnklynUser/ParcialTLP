@@ -9,6 +9,7 @@ from api.views.producto_view import ProductoViewSet
 from api.views.promocion_view import PromocionViewSet
 from api.views.condicion_promocion_view import CondicionPromocionViewSet
 from api.views.beneficio_promocion_view import BeneficioPromocionViewSet
+from api.views.promocion_escalonada_view import PromocionEscalonadaView, PromocionEscalonadaConAdicionalView
 
 router = DefaultRouter()
 router.register(r'empresas', EmpresaViewSet)
@@ -21,6 +22,8 @@ router.register(r'productos', ProductoViewSet)
 router.register(r'promociones', PromocionViewSet)
 router.register(r'condiciones', CondicionPromocionViewSet)
 router.register(r'beneficios', BeneficioPromocionViewSet)
+router.register(r'promociones_escalonadas', PromocionEscalonadaView)
+router.register(r'promociones_escalonadas_con_adicional', PromocionEscalonadaConAdicionalView)
 
 
-urlpatterns = router.urls 
+urlpatterns = router.urls

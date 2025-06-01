@@ -17,8 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from api.routers import router
+from api.views.promocion_escalonada_view import PromocionEscalonadaView, PromocionEscalonadaConAdicionalView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
+    path('api/promocion-escalonada/', PromocionEscalonadaView.as_view(), name='promocion-escalonada'),
+    path('api/promocion-escalonada-adicional/', PromocionEscalonadaConAdicionalView.as_view(), name='promocion-escalonada-adicional'),
 ]
