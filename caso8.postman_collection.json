@@ -1,7 +1,6 @@
 {
   "info": {
-    "_postman_id": "b1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "Motor de Promociones - Caso 7",
+    "name": "Motor de Promociones - Caso 8",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -24,21 +23,12 @@
       }
     },
     {
-      "name": "Crear Línea de Producto",
+      "name": "Crear Sucursal",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": { "raw": "{{baseUrl}}/api/lineas/", "host": ["{{baseUrl}}"], "path": ["api", "lineas", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Bebidas\",\n  \"categoria\": null\n}" }
-      }
-    },
-    {
-      "name": "Crear Producto AB",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": { "raw": "{{baseUrl}}/api/productos/", "host": ["{{baseUrl}}"], "path": ["api", "productos", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"AB\",\n  \"codigo\": \"AB001\",\n  \"marca\": \"MarcaX\",\n  \"linea\": 1\n}" }
+        "url": { "raw": "{{baseUrl}}/api/sucursales/", "host": ["{{baseUrl}}"], "path": ["api", "sucursales", ""] },
+        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sucursal Central\",\n  \"empresa\": 1\n}" }
       }
     },
     {
@@ -51,21 +41,39 @@
       }
     },
     {
-      "name": "Crear Sucursal",
+      "name": "Crear Línea de Producto",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": { "raw": "{{baseUrl}}/api/sucursales/", "host": ["{{baseUrl}}"], "path": ["api", "sucursales", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Sucursal Central\",\n  \"empresa\": 1\n}" }
+        "url": { "raw": "{{baseUrl}}/api/lineas/", "host": ["{{baseUrl}}"], "path": ["api", "lineas", ""] },
+        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Bebidas\"\n}" }
       }
     },
     {
-      "name": "Crear Promoción Escalonada (Caso 7)",
+      "name": "Crear Producto AB",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/productos/", "host": ["{{baseUrl}}"], "path": ["api", "productos", ""] },
+        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"AB\",\n  \"linea\": 1\n}" }
+      }
+    },
+    {
+      "name": "Crear Producto C",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/productos/", "host": ["{{baseUrl}}"], "path": ["api", "productos", ""] },
+        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"C\",\n  \"linea\": 1\n}" }
+      }
+    },
+    {
+      "name": "Crear Promoción Escalonada (Caso 8)",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/promociones/", "host": ["{{baseUrl}}"], "path": ["api", "promociones", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Promo Escalonada AB\",\n  \"fecha_inicio\": \"2025-06-01\",\n  \"fecha_fin\": \"2025-12-31\",\n  \"tipo_promocion\": \"escalonada\",\n  \"empresa\": 1,\n  \"sucursal\": 1,\n  \"canal_cliente\": 1,\n  \"producto_adicional\": null\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"nombre\": \"Promo Escalonada AB + C\",\n  \"empresa\": 1,\n  \"sucursal\": 1,\n  \"canal_cliente\": 1,\n  \"fecha_inicio\": \"2025-06-01\",\n  \"fecha_fin\": \"2025-12-31\"\n}" }
       }
     },
     {
@@ -74,7 +82,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/condiciones/", "host": ["{{baseUrl}}"], "path": ["api", "condiciones", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_condicion\": \"cantidad_escala\",\n  \"valor_min\": 6,\n  \"valor_max\": 17,\n  \"producto\": 1,\n  \"linea_producto\": null,\n  \"bonificacion_descuento\": null\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_condicion\": \"cantidad_escala\",\n  \"producto\": 1,\n  \"valor_min\": 6,\n  \"valor_max\": 17\n}" }
       }
     },
     {
@@ -83,7 +91,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/condiciones/", "host": ["{{baseUrl}}"], "path": ["api", "condiciones", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_condicion\": \"cantidad_escala\",\n  \"valor_min\": 18,\n  \"valor_max\": null,\n  \"producto\": 1,\n  \"linea_producto\": null,\n  \"bonificacion_descuento\": null\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_condicion\": \"cantidad_escala\",\n  \"producto\": 1,\n  \"valor_min\": 18\n}" }
       }
     },
     {
@@ -92,7 +100,7 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/beneficios/", "host": ["{{baseUrl}}"], "path": ["api", "beneficios", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 1,\n  \"cantidad\": 2,\n  \"porcentaje_descuento\": null\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 1,\n  \"cantidad\": 2\n}" }
       }
     },
     {
@@ -101,16 +109,25 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/beneficios/", "host": ["{{baseUrl}}"], "path": ["api", "beneficios", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 1,\n  \"cantidad\": 9,\n  \"porcentaje_descuento\": null\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 1,\n  \"cantidad\": 9\n}" }
       }
     },
     {
-      "name": "Crear Pedido para probar promoción (caso 7)",
+      "name": "Crear Beneficio Bonificación C (2 unidades, solo para 18 cajas o más)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/beneficios/", "host": ["{{baseUrl}}"], "path": ["api", "beneficios", ""] },
+        "body": { "mode": "raw", "raw": "{\n  \"promocion\": 1,\n  \"tipo_beneficio\": \"bonificacion\",\n  \"producto_bonificado\": 2,\n  \"cantidad\": 2\n}" }
+      }
+    },
+    {
+      "name": "Crear Pedido para probar promoción (caso 8)",
       "request": {
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/pedidos/", "host": ["{{baseUrl}}"], "path": ["api", "pedidos", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"cliente\": 1,\n  \"sucursal\": 1,\n  \"detalles\": [\n    { \"producto\": 1, \"cantidad\": 36, \"precio_unitario\": 10 }\n  ]\n}" }
+        "body": { "mode": "raw", "raw": "{\n  \"cliente\": 1,\n  \"sucursal\": 1,\n  \"detalles\": [\n    { \"producto\": 1, \"cantidad\": 108, \"precio_unitario\": 10 }\n  ]\n}" }
       }
     }
   ]
