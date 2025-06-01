@@ -197,38 +197,47 @@ class PromocionEngine:
                     promocion=promo,
                     tipo_beneficio='bonificacion'
                 )
-                
+                bonificacion_principal_aplicada = False  # Solo una bonificación principal
                 for beneficio in beneficios_aplicables:
                     # Verificar si es producto principal o adicional
-                    if beneficio.producto_bonificado == condicion.producto:
+                    if beneficio.producto_bonificado == condicion.producto and not bonificacion_principal_aplicada:
                         # Beneficio del producto principal (AB)
                         cantidad = 9 if cajas_compradas >= 18 else 2
+                        if cantidad > 0:
+                            self.bonificaciones.append({
+                                'producto_bonificado': beneficio.producto_bonificado.id,
+                                'cantidad': cantidad,
+                                'tipo': 'producto_principal'
+                            })
+                            PromocionAplicada.objects.create(
+                                pedido=self.pedido,
+                                promocion=promo,
+                                descripcion_resultado=(
+                                    f"Bonificación por volumen: {cantidad} unidades de "
+                                    f"{beneficio.producto_bonificado.nombre} por compra de "
+                                    f"{int(cajas_compradas)} cajas"
+                                )
+                            )
+                            bonificacion_principal_aplicada = True
                     elif (promo.producto_adicional and 
                           beneficio.producto_bonificado.id == promo.producto_adicional.id):
                         # Beneficio del producto adicional (C) - Solo para CASO 8
                         cantidad = beneficio.cantidad if cajas_compradas >= 18 else 0
-                    else:
-                        continue
-                    
-                    if cantidad > 0:
-                        self.bonificaciones.append({
-                            'producto_bonificado': beneficio.producto_bonificado.id,
-                            'cantidad': cantidad,
-                            'tipo': 'producto_adicional' if (promo.producto_adicional and 
-                                   beneficio.producto_bonificado.id == promo.producto_adicional.id) 
-                                   else 'producto_principal'
-                        })
-                        
-                        PromocionAplicada.objects.create(
-                            pedido=self.pedido,
-                            promocion=promo,
-                            descripcion_resultado=(
-                                f"Bonificación por volumen: {cantidad} unidades de "
-                                f"{beneficio.producto_bonificado.nombre} por compra de "
-                                f"{int(cajas_compradas)} cajas"
+                        if cantidad > 0:
+                            self.bonificaciones.append({
+                                'producto_bonificado': beneficio.producto_bonificado.id,
+                                'cantidad': cantidad,
+                                'tipo': 'producto_adicional'
+                            })
+                            PromocionAplicada.objects.create(
+                                pedido=self.pedido,
+                                promocion=promo,
+                                descripcion_resultado=(
+                                    f"Bonificación por volumen: {cantidad} unidades de "
+                                    f"{beneficio.producto_bonificado.nombre} por compra de "
+                                    f"{int(cajas_compradas)} cajas"
+                                )
                             )
-                        )
-                
                 self.promociones_aplicadas.append(promo)
                 return
 
@@ -262,4 +271,3 @@ class PromocionEngine:
         # TODO: Implementar evaluación de condiciones.
         return False
 
-  
