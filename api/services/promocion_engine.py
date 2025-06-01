@@ -173,6 +173,7 @@ class PromocionEngine:
     def _aplicar_bonificacion_escalonada_volumen(self, promo, condicion):
         """
         Caso 7: Bonificación escalonada por volumen (por ejemplo, por cajas compradas).
+        Caso 8: Bonificación escalonada por volumen con producto adicional en el rango más alto.
         Solo se ejecuta si la condición es de tipo 'cantidad_escala' y tiene producto asociado.
         """
         cantidad_pedido = sum([
@@ -195,12 +196,12 @@ class PromocionEngine:
                 break
 
         if escala_aplicada:
-            beneficios = promo.beneficios.filter(tipo_beneficio='bonificacion', producto_bonificado=condicion.producto)
-            for beneficio in beneficios:
-                # Definir la cantidad bonificada según la escala (ejemplo: 2 si >=3 cajas, 9 si >=18 cajas)
+            # Bonificación del producto principal (caso 7 y 8)
+            beneficios_principal = promo.beneficios.filter(tipo_beneficio='bonificacion', producto_bonificado=condicion.producto)
+            for beneficio in beneficios_principal:
                 if cajas_compradas >= 18:
                     cantidad_bonificada = 9
-                elif cajas_compradas >= 3:
+                elif cajas_compradas >= 6:
                     cantidad_bonificada = 2
                 else:
                     cantidad_bonificada = 0
@@ -217,6 +218,24 @@ class PromocionEngine:
                             f"Bonificación por volumen: {cantidad_bonificada} unidades de "
                             f"{beneficio.producto_bonificado.nombre} por compra de "
                             f"{int(cajas_compradas)} cajas"
+                        )
+                    )
+                    self.promociones_aplicadas.append(promo)
+            # Bonificación de producto adicional solo para el rango más alto (caso 8)
+            if cajas_compradas >= 18:
+                beneficios_adicionales = promo.beneficios.filter(tipo_beneficio='bonificacion').exclude(producto_bonificado=condicion.producto)
+                for beneficio in beneficios_adicionales:
+                    self.bonificaciones.append({
+                        'producto_bonificado': beneficio.producto_bonificado.id,
+                        'cantidad': beneficio.cantidad,
+                        'tipo': 'producto_adicional'
+                    })
+                    PromocionAplicada.objects.create(
+                        pedido=self.pedido,
+                        promocion=promo,
+                        descripcion_resultado=(
+                            f"Bonificación adicional: {beneficio.cantidad} unidades de "
+                            f"{beneficio.producto_bonificado.nombre} por compra de {int(cajas_compradas)} cajas"
                         )
                     )
                     self.promociones_aplicadas.append(promo)
