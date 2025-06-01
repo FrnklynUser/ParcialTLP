@@ -167,86 +167,63 @@ class PromocionEngine:
             else:
                 print(f"[DEBUG] No se alcanza el importe mínimo para el producto {condicion.producto.id}. Importe: {importe_producto}, Mínimo: {condicion.valor_min}")
         # CASO 7 y 8: Bonificación escalonada por volumen
-        if condicion.tipo_condicion == 'cantidad_escala' and condicion.producto:
+        elif condicion.tipo_condicion == 'cantidad_escala' and condicion.producto:
             self._aplicar_bonificacion_escalonada_volumen(promo, condicion)
 
     def _aplicar_bonificacion_escalonada_volumen(self, promo, condicion):
         """
-        Bonificación escalonada por volumen (por ejemplo, por cajas compradas).
-        Aplica solo el beneficio correspondiente al rango alcanzado.
-        Soporta bonificación de producto adicional en el rango más alto (caso 8).
+        Aplica bonificaciones escalonadas por volumen según rangos definidos.
+        Caso 7: 
+        - 6 cajas (36 unidades) -> 2 unidades bonificadas
+        - 18 cajas (108 unidades) -> 9 unidades bonificadas
         """
+        # Verificar si ya se aplicó una bonificación para este producto
+        producto_id = condicion.producto.id
+        if hasattr(self, '_productos_bonificados') and producto_id in self._productos_bonificados:
+            return
+            
         cantidad_pedido = sum([
-            d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
+            d['cantidad'] for d in self.detalles if int(d['producto']) == producto_id
         ])
-        UNIDADES_POR_CAJA = 6  # Ajustar si la cantidad por caja es diferente
-        cajas_compradas = cantidad_pedido / UNIDADES_POR_CAJA
-
-        # Buscar todas las escalas de bonificación para este producto y promoción
-        condiciones_escala = CondicionPromocion.objects.filter(
-            promocion=promo,
-            tipo_condicion='cantidad_escala',
-            producto=condicion.producto
-        ).order_by('-valor_min')
-
-        # Determinar la mejor escala alcanzada
-        mejor_escala = None
-        for escala in condiciones_escala:
-            if cajas_compradas >= escala.valor_min:
-                mejor_escala = escala
-                break
-
-        if mejor_escala:
-            # Buscar el beneficio correspondiente a la escala alcanzada para el producto principal
-            beneficio_principal = BeneficioPromocion.objects.filter(
-                promocion=promo,
-                tipo_beneficio='bonificacion',
-                producto_bonificado=condicion.producto
-            ).order_by('-cantidad')
-            cantidad_bonificada = 0
-            for beneficio in beneficio_principal:
-                # Relacionar cantidad del beneficio con el rango alcanzado
-                if mejor_escala.valor_min == 18 and beneficio.cantidad == 9:
-                    cantidad_bonificada = 9
-                elif mejor_escala.valor_min == 6 and beneficio.cantidad == 2:
-                    cantidad_bonificada = 2
-            if cantidad_bonificada > 0:
-                self.bonificaciones.append({
-                    'producto_bonificado': condicion.producto.id,
-                    'cantidad': cantidad_bonificada,
-                    'tipo': 'producto_principal'
-                })
-                PromocionAplicada.objects.create(
-                    pedido=self.pedido,
-                    promocion=promo,
-                    descripcion_resultado=(
-                        f"Bonificación por volumen: {cantidad_bonificada} unidades de "
-                        f"{condicion.producto.nombre} por compra de "
-                        f"{int(cajas_compradas)} cajas"
-                    )
-                )
-                self.promociones_aplicadas.append(promo)
-            # Bonificación de producto adicional solo para el rango más alto (caso 8)
-            if mejor_escala.valor_min == 18:
-                beneficios_adicionales = BeneficioPromocion.objects.filter(
-                    promocion=promo,
-                    tipo_beneficio='bonificacion'
-                ).exclude(producto_bonificado=condicion.producto)
-                for beneficio in beneficios_adicionales:
-                    self.bonificaciones.append({
-                        'producto_bonificado': beneficio.producto_bonificado.id,
-                        'cantidad': beneficio.cantidad,
-                        'tipo': 'producto_adicional'
-                    })
-                    PromocionAplicada.objects.create(
-                        pedido=self.pedido,
-                        promocion=promo,
-                        descripcion_resultado=(
-                            f"Bonificación adicional: {beneficio.cantidad} unidades de "
-                            f"{beneficio.producto_bonificado.nombre} por compra de {int(cajas_compradas)} cajas"
+        
+        # Convertir cantidad de unidades a cajas (6 unidades por caja)
+        cajas = cantidad_pedido / 6
+        
+        # Determinar la bonificación según el rango
+        bonificacion = 0
+        if cajas >= 18:  # 18 cajas o más
+            bonificacion = 9
+        elif cajas >= 6:  # Entre 6 y 17 cajas
+            bonificacion = 2
+            
+        if bonificacion > 0:
+            for beneficio in promo.beneficios.all():
+                if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
+                    # Verificar que el producto bonificado sea el mismo que el producto comprado
+                    if beneficio.producto_bonificado.id == producto_id:
+                        # Marcar el producto como bonificado
+                        if not hasattr(self, '_productos_bonificados'):
+                            self._productos_bonificados = set()
+                        self._productos_bonificados.add(producto_id)
+                        
+                        self.bonificaciones.append({
+                            'producto_bonificado': beneficio.producto_bonificado.id,
+                            'cantidad': bonificacion
+                        })
+                        
+                        descripcion = (
+                            f"Bonificación escalonada: {bonificacion} unidades de "
+                            f"{beneficio.producto_bonificado.nombre} por compra de "
+                            f"{cantidad_pedido} unidades ({cajas:.0f} cajas)"
                         )
-                    )
-                    self.promociones_aplicadas.append(promo)
+                        
+                        PromocionAplicada.objects.create(
+                            pedido=self.pedido,
+                            promocion=promo,
+                            descripcion_resultado=descripcion
+                        )
+                        self.promociones_aplicadas.append(promo)
+                        break
 
     def _filtrar_promociones(self):
         hoy = date.today()
