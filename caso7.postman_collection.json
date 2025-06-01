@@ -110,7 +110,10 @@
         "method": "POST",
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "url": { "raw": "{{baseUrl}}/api/pedidos/", "host": ["{{baseUrl}}"], "path": ["api", "pedidos", ""] },
-        "body": { "mode": "raw", "raw": "{\n  \"cliente\": 1,\n  \"sucursal\": 1,\n  \"detalles\": [\n    { \"producto\": 1, \"cantidad\": 36, \"precio_unitario\": 10 }\n  ]\n}" }
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"cliente\": 1,\n  \"sucursal\": 1,\n  \"detalles\": [\n    { \"producto\": 1, \"cantidad\": 36, \"precio_unitario\": 10 }\n  ]\n}"
+        }
       }
     }
   ]
