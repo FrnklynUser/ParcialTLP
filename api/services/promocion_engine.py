@@ -172,9 +172,9 @@ class PromocionEngine:
 
     def _aplicar_bonificacion_escalonada_volumen(self, promo, condicion):
         """
-        Caso 7: Bonificación escalonada por volumen (por ejemplo, por cajas compradas).
-        Caso 8: Bonificación escalonada por volumen con producto adicional en el rango más alto.
-        Solo se ejecuta si la condición es de tipo 'cantidad_escala' y tiene producto asociado.
+        Bonificación escalonada por volumen (por ejemplo, por cajas compradas).
+        Aplica solo el beneficio correspondiente al rango alcanzado.
+        Soporta bonificación de producto adicional en el rango más alto (caso 8).
         """
         cantidad_pedido = sum([
             d['cantidad'] for d in self.detalles if int(d['producto']) == condicion.producto.id
@@ -182,48 +182,56 @@ class PromocionEngine:
         UNIDADES_POR_CAJA = 6  # Ajustar si la cantidad por caja es diferente
         cajas_compradas = cantidad_pedido / UNIDADES_POR_CAJA
 
-        # Buscar escalas de bonificación para este producto y promoción
+        # Buscar todas las escalas de bonificación para este producto y promoción
         condiciones_escala = CondicionPromocion.objects.filter(
             promocion=promo,
             tipo_condicion='cantidad_escala',
             producto=condicion.producto
         ).order_by('-valor_min')
 
-        escala_aplicada = None
+        # Determinar la mejor escala alcanzada
+        mejor_escala = None
         for escala in condiciones_escala:
             if cajas_compradas >= escala.valor_min:
-                escala_aplicada = escala
+                mejor_escala = escala
                 break
 
-        if escala_aplicada:
-            # Bonificación del producto principal (caso 7 y 8)
-            beneficios_principal = promo.beneficios.filter(tipo_beneficio='bonificacion', producto_bonificado=condicion.producto)
-            for beneficio in beneficios_principal:
-                if cajas_compradas >= 18:
+        if mejor_escala:
+            # Buscar el beneficio correspondiente a la escala alcanzada para el producto principal
+            beneficio_principal = BeneficioPromocion.objects.filter(
+                promocion=promo,
+                tipo_beneficio='bonificacion',
+                producto_bonificado=condicion.producto
+            ).order_by('-cantidad')
+            cantidad_bonificada = 0
+            for beneficio in beneficio_principal:
+                # Relacionar cantidad del beneficio con el rango alcanzado
+                if mejor_escala.valor_min == 18 and beneficio.cantidad == 9:
                     cantidad_bonificada = 9
-                elif cajas_compradas >= 6:
+                elif mejor_escala.valor_min == 6 and beneficio.cantidad == 2:
                     cantidad_bonificada = 2
-                else:
-                    cantidad_bonificada = 0
-                if cantidad_bonificada > 0:
-                    self.bonificaciones.append({
-                        'producto_bonificado': beneficio.producto_bonificado.id,
-                        'cantidad': cantidad_bonificada,
-                        'tipo': 'producto_principal'
-                    })
-                    PromocionAplicada.objects.create(
-                        pedido=self.pedido,
-                        promocion=promo,
-                        descripcion_resultado=(
-                            f"Bonificación por volumen: {cantidad_bonificada} unidades de "
-                            f"{beneficio.producto_bonificado.nombre} por compra de "
-                            f"{int(cajas_compradas)} cajas"
-                        )
+            if cantidad_bonificada > 0:
+                self.bonificaciones.append({
+                    'producto_bonificado': condicion.producto.id,
+                    'cantidad': cantidad_bonificada,
+                    'tipo': 'producto_principal'
+                })
+                PromocionAplicada.objects.create(
+                    pedido=self.pedido,
+                    promocion=promo,
+                    descripcion_resultado=(
+                        f"Bonificación por volumen: {cantidad_bonificada} unidades de "
+                        f"{condicion.producto.nombre} por compra de "
+                        f"{int(cajas_compradas)} cajas"
                     )
-                    self.promociones_aplicadas.append(promo)
+                )
+                self.promociones_aplicadas.append(promo)
             # Bonificación de producto adicional solo para el rango más alto (caso 8)
-            if cajas_compradas >= 18:
-                beneficios_adicionales = promo.beneficios.filter(tipo_beneficio='bonificacion').exclude(producto_bonificado=condicion.producto)
+            if mejor_escala.valor_min == 18:
+                beneficios_adicionales = BeneficioPromocion.objects.filter(
+                    promocion=promo,
+                    tipo_beneficio='bonificacion'
+                ).exclude(producto_bonificado=condicion.producto)
                 for beneficio in beneficios_adicionales:
                     self.bonificaciones.append({
                         'producto_bonificado': beneficio.producto_bonificado.id,
