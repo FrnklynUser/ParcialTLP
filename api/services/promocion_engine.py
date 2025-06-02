@@ -169,6 +169,8 @@ class PromocionEngine:
         # CASO 7 y 8: Bonificación escalonada por volumen
         elif condicion.tipo_condicion == 'cantidad_escala' and condicion.producto:
             self._aplicar_bonificacion_escalonada_volumen(promo, condicion)
+        elif condicion.tipo_condicion == 'importe_escala_bonificacion' and condicion.producto:
+            self._aplicar_bonificacion_escala_importe(promo, condicion)
 
     def _aplicar_bonificacion_escalonada_volumen(self, promo, condicion):
         """
@@ -215,6 +217,62 @@ class PromocionEngine:
                             f"Bonificación escalonada: {bonificacion} unidades de "
                             f"{beneficio.producto_bonificado.nombre} por compra de "
                             f"{cantidad_pedido} unidades ({cajas:.0f} cajas)"
+                        )
+                        
+                        PromocionAplicada.objects.create(
+                            pedido=self.pedido,
+                            promocion=promo,
+                            descripcion_resultado=descripcion
+                        )
+                        self.promociones_aplicadas.append(promo)
+                        break
+
+    def _aplicar_bonificacion_escala_importe(self, promo, condicion):
+        """
+        Aplica bonificaciones escalonadas por importe según rangos definidos.
+        Caso 10:
+        - Compras entre S/5000 y S/9999.99 -> 1 caja bonificada
+        - Compras >= S/10000 -> 3 cajas bonificadas
+        """
+        producto_id = condicion.producto.id
+        
+        # Evitar aplicar la bonificación más de una vez al mismo producto
+        if hasattr(self, '_productos_bonificados_importe') and producto_id in self._productos_bonificados_importe:
+            return
+            
+        importe_producto = sum([
+            d['cantidad'] * d.get('precio_unitario', 0)
+            for d in self.detalles if int(d['producto']) == producto_id
+        ])
+        
+        # Determinar la bonificación según el rango de importe
+        bonificacion_cajas = 0
+        if importe_producto >= 10000:
+            bonificacion_cajas = 3
+        elif importe_producto >= 5000:
+            bonificacion_cajas = 1
+            
+        if bonificacion_cajas > 0:
+            for beneficio in promo.beneficios.all():
+                if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
+                    if beneficio.producto_bonificado.id == producto_id:
+                        # Marcar el producto como bonificado por importe
+                        if not hasattr(self, '_productos_bonificados_importe'):
+                            self._productos_bonificados_importe = set()
+                        self._productos_bonificados_importe.add(producto_id)
+                        
+                        # Convertir cajas a unidades (asumiendo 6 unidades por caja)
+                        unidades_bonificadas = bonificacion_cajas * 6
+                        
+                        self.bonificaciones.append({
+                            'producto_bonificado': beneficio.producto_bonificado.id,
+                            'cantidad': unidades_bonificadas
+                        })
+                        
+                        descripcion = (
+                            f"Bonificación por escala de importe: {bonificacion_cajas} cajas "
+                            f"({unidades_bonificadas} unidades) de {beneficio.producto_bonificado.nombre} "
+                            f"por compra de S/{importe_producto:.2f}"
                         )
                         
                         PromocionAplicada.objects.create(
