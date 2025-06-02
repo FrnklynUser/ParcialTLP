@@ -176,7 +176,10 @@ class PromocionEngine:
             self._aplicar_bonificacion_escala_fija(promo, condicion)
         # CASO 12: Bonificación + descuento por volumen combinado
         elif condicion.tipo_condicion == 'volumen_combinado' and condicion.linea_producto:
-            self._aplicar_promocion_combinada(promo, condicion)    
+            self._aplicar_promocion_combinada(promo, condicion)   
+        # CASO 13: Descuento por compra combinada de productos específicos
+        elif condicion.tipo_condicion == 'compra_combinada_productos':
+            self._aplicar_descuento_compra_combinada(promo, condicion)     
 
     def _aplicar_bonificacion_escalonada_volumen(self, promo, condicion):
         """
@@ -431,4 +434,61 @@ class PromocionEngine:
                 descripcion_resultado=descripcion
             )
             self.promociones_aplicadas.append(promo)
+
+    def _aplicar_descuento_compra_combinada(self, promo, condicion):
+        """
+        Aplica descuento por compra combinada de productos específicos.
+        Caso 13:
+        - Compra de producto A (pisco) + producto B (gaseosa) -> 5% descuento
+        """
+        # Verificar si ya se aplicó el descuento para esta combinación
+        if not hasattr(self, '_descuentos_combinados_aplicados'):
+            self._descuentos_combinados_aplicados = set()
+            
+        combo_key = f"{condicion.producto.id}-{condicion.producto_secundario.id}"
+        if combo_key in self._descuentos_combinados_aplicados:
+            return
+            
+        # Verificar la presencia de ambos productos en el pedido
+        producto_a_presente = False
+        producto_b_presente = False
+        importe_total = 0
+        
+        for d in self.detalles:
+            try:
+                producto = Producto.objects.get(id=d['producto'])
+                if producto.id == condicion.producto.id:  # Pisco
+                    producto_a_presente = True
+                    importe_total += d['cantidad'] * d.get('precio_unitario', 0)
+                elif producto.id == condicion.producto_secundario.id:  # Gaseosa
+                    producto_b_presente = True
+                    importe_total += d['cantidad'] * d.get('precio_unitario', 0)
+            except Producto.DoesNotExist:
+                continue
+
+        # Solo aplicar el descuento si ambos productos están presentes
+        if producto_a_presente and producto_b_presente:
+            self._descuentos_combinados_aplicados.add(combo_key)
+            
+            for beneficio in promo.beneficios.all():
+                if beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                    descuento = importe_total * (beneficio.porcentaje_descuento / 100)
+                    self.bonificaciones.append({
+                        'producto_descuento': [condicion.producto.id, condicion.producto_secundario.id],
+                        'porcentaje_descuento': beneficio.porcentaje_descuento,
+                        'monto_descuento': round(descuento, 2)
+                    })
+                    
+                    descripcion = (
+                        f"Descuento del {beneficio.porcentaje_descuento}% por compra combinada de "
+                        f"{condicion.producto.nombre} y {condicion.producto_secundario.nombre}: "
+                        f"S/{round(descuento,2)}"
+                    )
+                    
+                    PromocionAplicada.objects.create(
+                        pedido=self.pedido,
+                        promocion=promo,
+                        descripcion_resultado=descripcion
+                    )
+                    self.promociones_aplicadas.append(promo)
 
