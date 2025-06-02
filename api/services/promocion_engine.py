@@ -174,6 +174,9 @@ class PromocionEngine:
         # CASO 11: Bonificación escalonada por importe con rangos específicos
         elif condicion.tipo_condicion == 'importe_escala_fija' and condicion.producto:
             self._aplicar_bonificacion_escala_fija(promo, condicion)
+        # CASO 12: Bonificación + descuento por volumen combinado
+        elif condicion.tipo_condicion == 'volumen_combinado' and condicion.linea_producto:
+            self._aplicar_promocion_combinada(promo, condicion)    
 
     def _aplicar_bonificacion_escalonada_volumen(self, promo, condicion):
         """
@@ -368,4 +371,64 @@ class PromocionEngine:
         """
         # TODO: Implementar evaluación de condiciones.
         return False
+
+    def _aplicar_promocion_combinada(self, promo, condicion):
+        """
+        Aplica una promoción combinada (bonificación + descuento) por volumen.
+        Caso 12:
+        - Compra > 6 cajas (72 unidades) de detergentes -> 3 unidades gratis + 5% descuento
+        """
+        # Verificar si ya se aplicó una promoción combinada para esta línea
+        if not hasattr(self, '_promociones_combinadas_aplicadas'):
+            self._promociones_combinadas_aplicadas = set()
+            
+        if condicion.linea_producto.id in self._promociones_combinadas_aplicadas:
+            return
+            
+        # Calcular cantidad total de unidades en la línea de producto
+        cantidad_total = 0
+        importe_total = 0
+        for d in self.detalles:
+            try:
+                producto = Producto.objects.get(id=d['producto'])
+                if producto.linea_id == condicion.linea_producto.id:
+                    cantidad_total += d['cantidad']
+                    importe_total += d['cantidad'] * d.get('precio_unitario', 0)
+            except Producto.DoesNotExist:
+                continue
+
+        # Convertir a cajas (12 unidades por caja para detergentes)
+        cajas = cantidad_total / 12
+        
+        if cajas > 6:  # Más de 6 cajas
+            self._promociones_combinadas_aplicadas.add(condicion.linea_producto.id)
+            
+            # Aplicar bonificación
+            for beneficio in promo.beneficios.all():
+                if beneficio.tipo_beneficio == 'bonificacion' and beneficio.producto_bonificado:
+                    self.bonificaciones.append({
+                        'producto_bonificado': beneficio.producto_bonificado.id,
+                        'cantidad': 3  # 3 unidades gratis
+                    })
+                # Aplicar descuento
+                elif beneficio.tipo_beneficio == 'descuento' and beneficio.porcentaje_descuento:
+                    descuento = importe_total * (beneficio.porcentaje_descuento / 100)
+                    self.bonificaciones.append({
+                        'linea_descuento': condicion.linea_producto.id,
+                        'porcentaje_descuento': beneficio.porcentaje_descuento,
+                        'monto_descuento': round(descuento, 2)
+                    })
+            
+            descripcion = (
+                f"Promoción combinada en {condicion.linea_producto.nombre}: "
+                f"3 unidades gratis de GLO1 + 5% descuento "
+                f"por compra de {cantidad_total} unidades ({cajas:.1f} cajas)"
+            )
+            
+            PromocionAplicada.objects.create(
+                pedido=self.pedido,
+                promocion=promo,
+                descripcion_resultado=descripcion
+            )
+            self.promociones_aplicadas.append(promo)
 
